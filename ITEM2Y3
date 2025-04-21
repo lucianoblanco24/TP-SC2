@@ -1,1 +1,126 @@
+% % Sistemas de Control II -FCEFyN-UNC
+% Docente: Dr. Ing. Pucheta, Julian
+% Alumno: Blanco Luciano Joaquin
+% Actividad Práctica N1 - Caso 1
+%   Item 2
+%   En el archivo Curvas_Medidas_RLC_2025.xls (datos en la hoja 1 y etiquetas en la hoja
+%   2) están las series de datos que sirven para deducir los valores de R, L y C del circuito. Emplear
+%   el método de la respuesta al escalón, tomando como salida la tensión en
+%   el capacitor.
+%
+%   Item 3
+%   Una vez determinados los parámetros R, L y C, emplear la serie de corriente desde
+%   0.05seg en adelante para validar el resultado superponiendo las gráficas.
 
+clear all; close all; clc;
+
+% Lectura de datos
+values   = xlsread('Curvas_Medidas_RLC_2025.xls');
+time     = values(1:end,1);
+iSignal  = values(1:end,2);
+vcSignal = values(1:end,3);
+uSignal  = values(1:end,4);
+
+% Gráficas de datos importados
+% 1) Tensión en el capacitor
+figure(1)
+subplot(3,1,1);
+plot(time,vcSignal, 'b');title('Tension Capacitor , V_t');grid on;hold on;
+% 2) Corriente en el circuito
+subplot(3,1,2);
+plot(time, iSignal, 'b');title('Corriente , I_t');grid on;hold on;
+% 3) Tensión de entrada
+subplot(3,1,3);
+plot(time, uSignal, 'b');title('Tensión de entrada , U_t');grid on;hold on;
+
+vin = 12;
+
+%Metodo de Chen
+
+% Elección de las tres muestras para aplicar el método, teniendo en cuenta
+% que las mismas deben tomarse sobre el transitorio de la señal y siguiendo
+% las condiciones del método
+
+% 1) Elección de valores sobre el plot de Vc
+t1_v = values(1060,1);        y1_v = values(1060,3);
+t2_v = values(1085,1);        y2_v = values(1085,3);
+t3_v = values(1110,1);        y3_v = values(1110,3);
+
+%Grafico mis 3 puntos elegidos en la figura 1:
+figure(1)
+subplot(3,1,1); hold on
+plot([t1_v t2_v t3_v],[y1_v y2_v y3_v],'*'); hold on; 
+
+% 2) Cálculo de ganancia en estado estacionario
+% Se obtiene la ganancia desde la gráfica ploteada con los datos del excel 
+% una vez que la respuesta del sistema se estabiliza y se procede a
+% normarlizarla para la aplicación del método porque con éste se busca una 
+% respuesta al escalon unitario
+
+K_v = values(4980,3)/vin;
+
+% 3) Normalización de valores
+% Se normaliza la altura de los puntos obtenidos del gráfico
+y1_v = y1_v/vin;
+y2_v = y2_v/vin; 
+y3_v = y3_v/vin;
+
+% 4) Aplicación del método
+% A) Se define ki = y(ti)/K - 1 para cada ecuación resultante de los 3
+% puntos 
+k1_v = (y1_v/K_v) - 1;   
+k2_v = (y2_v/K_v) - 1;   
+k3_v = (y3_v/K_v) - 1;
+
+% B) Se encuentran los valores de alfa1, alfa2 y beta según el método de
+% Chen
+b_v     = 4*(k1_v^3)*k3_v - 3*(k1_v^2)*(k2_v^2) - 4*(k2_v^3) + (k3_v^2) + 6*k1_v*k2_v*k3_v; 
+alfa1_v = (k1_v*k2_v + k3_v - sqrt(b_v))/(2*(k1_v^2 + k2_v)); 
+alfa2_v = (k1_v*k2_v + k3_v + sqrt(b_v))/(2*(k1_v^2 + k2_v)); 
+beta_v  = (k1_v+alfa2_v)/(alfa1_v-alfa2_v);                   
+
+% C) Cálculo de las constantes de tiempo de la FT
+T1_v = -(t1_v - 0.01)/log(alfa1_v);           
+T2_v = -(t1_v - 0.01)/log(alfa2_v);          
+T3_v = 0 ;                             
+
+% D) Definición de la función de transferencia obtenida con el método
+G_v = tf(K_v*[T3_v 1],conv([T1_v 1],[T2_v 1]));
+polos=pole(G_v);
+polo1=polos(1);
+polo2=polos(2);
+
+% E) Gráfica de los resultado obtenidos
+% Se compara la señal construida con los datos de la hoja de excel con la
+% salida del sistema al hacer uso de la FT obtenida con el método de Chen
+[y_G_v,t_G_v] = lsim(G_v,uSignal,time);
+figure(1)
+subplot(3,1,1)
+plot(time,vcSignal, 'k' ); grid on; hold on;
+plot(t_G_v,y_G_v,'r'); title('Respuesta utlizando Metodo de Chen y Señal extraída de tabla');
+legend({'Vc_t de tabla','Puntos','Vc_t método de Chen'},'Location','northeast')
+
+%ITEM 3  
+
+% Se obtiene C a partir de dVc/dt=(1/C)*i
+AVc  =  values(1110,3) - values(1109,3); %Obtengo la variación de Vc
+At   = t3_v - values(1109,1); %Obtengo la variación de t
+i_t3 = values(1110,2); %Obtengo la corriente en el instante final
+C    = (At*i_t3)/AVc ; %Calculo C
+
+% D) Definición de la función de transferencia derivando a la tensión y
+% multiplicando por C
+G_i = tf((C)*K_v*[1 0],conv([T1_v 1],[T2_v 1]));
+
+% Calculo R y L
+L   = (G_i.den{1}(1))/C;
+R   = (G_i.den{1}(2))/C;
+
+% 5) Gráfica de los resultado obtenidos
+% Se compara la señal construida con los datos de la hoja de excel con la
+% salida del sistema al hacer uso de la FT obtenida con el método de Chen
+[y_G_i,t_G_i] = lsim(G_i,uSignal,time);
+figure(2)
+plot(time, iSignal, 'k'); grid on; hold on;
+plot(t_G_i,y_G_i,'m'); title('Respuesta utlizando Metodo de Chen y Señal extraída de tabla');
+legend({'I_t de tabla','I_t método de Chen'},'Location','northeast')  
