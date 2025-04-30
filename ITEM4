@@ -56,7 +56,7 @@ polo3         = autovalores_A(3); % polo3
 %Calculo de tamano de paso:
 tint = log(0.95)/(3*polo3);
 
-%Ahora calculo el tiempo total de simulacion y lo llamare: TT
+%Ahora calculo el tiempo total de simulacion
 tF = 10*log(0.05)/polo2;
 
 %Tomo un tiempo de simulacion mayor que me permita estudiar la dinamica del
